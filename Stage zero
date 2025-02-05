@@ -1,3 +1,3 @@
-Introduction = ("Ganobi Chinwe", "Chinwe", "mailto:ganobichinwe19@gmail.com", "reading and playing video games", "Nigeria", "Medical Microbiology", "Python")
+Introduction = ("Ganobi Chinwe", "Chinwe", "ganobichinwe19@gmail.com", "reading and playing video games", "Nigeria", "Medical Microbiology", "Python")
 name,slack_username,email,hobby,country,discipline,preferred_programming_language = Introduction
 print(f"name:{name}, slack_username:{slack_username}, email:{email}, hobby:{hobby}, country:{country}, discipline:{discipline}, preferred_programming_language:{preferred_programming_language}")
