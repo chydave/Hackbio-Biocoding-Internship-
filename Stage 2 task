@@ -1,0 +1,97 @@
+#growth curve of OD600 vs Time
+import pandas as pd 
+data_source = "https://raw.githubusercontent.com/HackBio-Internship/2025_project_collection/refs/heads/main/Python/Dataset/mcgc.tsv"
+df = pd.read_csv(data_source, sep='\t') #load the dataset using tab as the separator
+#converting from wide dataset format to long format
+df_long = df.melt(id_vars=['time'], var_name='well', value_name='OD600')
+print(df_long.head(5))
+#mapping each well to strains and conditions
+well_mapping= {
+    'well': ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9','A10', 'A11', 'A12', 
+             'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12', 
+             'C1','C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12'],
+    'strain': ['strain1_rep1', 'strain1_rep1', 'strain1_rep2', 'strain1_rep2', 'strain2_rep1',
+               'strain2_rep1', 'strain2_rep2', 'strain2_rep2', 'strain3_rep1', 'strain3_rep1',
+               'strain3_rep2', 'strain3_rep2', 'strain1_rep1', 'strain1_rep1', 'strain1_rep2',
+               'strain1_rep2', 'strain2_rep1', 'strain2_rep1', 'strain2_rep2', 'strain2_rep2',
+               'strain3_rep1', 'strain3_rep1', 'strain3_rep2', 'strain3_rep2', 'strain1_rep1', 
+               'strain1_rep1', 'strain1_rep2', 'strain1_rep2', 'strain2_rep1', 'strain2_rep1', 
+               'strain2_rep2', 'strain2_rep2', 'strain3_rep1', 'strain3_rep1', 'strain3_rep2',
+               'strain3_rep2'], 
+    'condition': ['knock-in', 'knock-out', 'knock-in', 'knock-out', 'knock-in', 'knock-out', 
+                  'knock-in', 'knock-out', 'knock-in', 'knock-out', 'knock-in', 'knock-out',
+                  'knock-in', 'knock-out', 'knock-in', 'knock-out', 'knock-in', 'knock-out',
+                  'knock-in', 'knock-out', 'knock-in', 'knock-out', 'knock-in', 'knock-out',
+                  'knock-in', 'knock-out', 'knock-in', 'knock-out', 'knock-in', 'knock-out',
+                  'knock-in', 'knock-out', 'knock-in', 'knock-out', 'knock-in', 'knock-out']
+}
+mapping_df = pd.DataFrame(well_mapping)
+#Merging the mapping with the long-format DataFrame
+df_merged = pd.merge(df_long, mapping_df, on='well')
+print(df_merged)
+#growth curve of the knock out(-) and knock in (+) strain overlaid on top of each other
+import matplotlib.pyplot as plt
+import seaborn as sns
+df_merged['time'] = pd.to_numeric(df_merged['time'], errors='coerce')
+#plotting graph
+strains = df_merged['strain'].unique()
+for strain in strains:
+  plt.figure(figsize=(8, 4))
+  sns.lineplot(data=df_merged[df_merged['strain']== strain], x='time', y='OD600', hue='condition')
+  plt.title(f'Growth Curve for {strain}')
+  plt.xlabel('Time')
+  plt.ylabel('OD600')
+  plt.legend(title='condition')
+  plt.show()
+"""observation: In all strains except strain3_rep2, both the knock-in and knock-out strains got to the maximum time of 1400. 
+   As for strain3_rep2, the knock-in strain got to a time of 1000 while the knock-out strain got to 1400"""
+#Time to Carrying Capacity of each strain/mutant
+#calculate the time it takes to reach the carrying capacity for each strain/mutant
+import numpy as np
+def time_to_carrying_capacity(data):
+  carrying_capacity = data['OD600'].max()
+  threshold = 0.95 * carrying_capacity #95% of max OD600
+  times_above_threshold = data[data['OD600'] >= threshold]['time']
+  if not times_above_threshold.empty:
+    return times_above_threshold.iloc[0] #first time reaching threshold
+  else:
+    return np.nan #return nan if no
+results = []
+#Grouping by 'strain' and 'condition' and then computing the carrying capacity times
+for (strain, condition), group in df_merged.groupby(['strain', 'condition']):
+  t_cc = time_to_carrying_capacity(group)
+  results.append({'strain': strain, 'condition': condition, 'time_to_carrying_capacity': t_cc})
+#converting results to DataFrame
+cc_times = pd.DataFrame(results)
+print(cc_times)
+"""observation: strain3_rep2 (knock-out) gets to its time_to_carrying_capacity much faster than all other strains at 735
+  while strain1_rep1 (knock-out) get to its time_to_carrying_capacity at 1440 which is slower than all others"""
+#scatter plot
+import seaborn as sns
+import matplotlib.pyplot as plt
+#scatter plot of the time it takes to reach carrying capacity for the knock out and knock in strains
+plt.figure(figsize=(6, 4))
+sns.scatterplot(data=cc_times, x='condition', y='time_to_carrying_capacity', hue='strain')
+plt.title('Time to Carrying Capacity: knock-out vs. knock-in')
+plt.xlabel('strain type')
+plt.ylabel('time to carrying capacity')
+plt.show()
+#Box plot
+#box plot of the time it takes to reach carrying capacity for the knock out and knock in strains
+import seaborn as sns
+import matplotlib.pyplot as plt
+plt.figure(figsize=(6, 4))
+sns.boxplot(data=cc_times, x='condition', y='time_to_carrying_capacity')
+plt.title('Distribution of time to carrying capacity by strain type')
+plt.ylabel('time_to_carrying_capacity')
+plt.show()
+#statistical difference in the time it takes the knock out strains to reach maximum carrying capacity compared to the knock in strains
+from scipy.stats import ttest_ind
+knock_out_times = cc_times[cc_times['condition'] == 'knock-out']['time_to_carrying_capacity'].dropna()
+knock_in_times = cc_times[cc_times['condition'] == 'knock-in']['time_to_carrying_capacity'].dropna()
+#performing independent ttest for each
+t_stat, p_value = ttest_ind(knock_out_times, knock_in_times, equal_var=False)
+print(f"T-statistic: {t_stat:.4f}")
+print(f"p_value: {p_value:.4f}")
+"""observation: p_value is greater than 0.05 meaning there is no significant difference between 
+   the growth behaviour of the knock-in and knock-out strains""" 
